@@ -1,0 +1,77 @@
+#Implementing for enabling methods applicable for DataFrame such as 'sort'
+import requests
+from bs4 import BeautifulSoup
+from tabulate import tabulate
+import pandas as pd
+
+def format_name(full_name):
+    parts = full_name.split()
+    
+    first_name = ""
+    middle_name = ""
+    last_name = ""
+    
+    if len(parts) == 3:
+        first_name, middle_name, last_name = parts
+        
+        if len(middle_name) == 1:
+            middle_name += "."
+    elif len(parts) == 2:
+        first_name, last_name = parts
+    else:
+        return "Invalid name format"
+    
+    if middle_name:
+        return f"{first_name}+{middle_name}+{last_name}"
+    else:
+        return f"{first_name}+{last_name}"
+    
+def get_citations_and_hindex(prof_name):
+
+    search_url = f"https://www.adscientificindex.com/citation-ranking/?q={format_name(prof_name)}"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+
+    response = requests.get(search_url, headers=headers)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    citations = soup.find_all('div', class_='c-title', string='Citation')
+    citation_div = citations[0].find_parent().find_parent().text if len(citations) >= 1 else "N/A"
+    
+    h_indexes = soup.find_all('div', class_='c-title', string='H-Index')
+    h_index_div = h_indexes[0].find_parent().find_parent().text if len(h_indexes) >= 1 else "N/A"
+    
+    def parse_data(section_div):
+        lines = section_div.split('\n')
+        total = lines[6].split(':')[-1].strip().replace(',', '') #formatting total_citation value
+        last_6_years = lines[10].split(':')[-1].strip().replace(',', '') #formatting last6year_citation value
+        last_to_total = lines[14].split(':')[-1].strip().replace(',', '') #formatting last6year_to_total_citation value
+        
+        return total, last_6_years, last_to_total
+    
+    citation_total, citation_last_6_years, citation_fraction = parse_data(citation_div)
+    h_index_total, h_index_last_6_years, h_index_fraction = parse_data(h_index_div)
+    
+    return [prof_name, citation_total, h_index_total, citation_last_6_years, h_index_last_6_years, citation_fraction, h_index_fraction]
+
+file_path = "Dictionary__248256579.xlsx"
+names_raw = pd.read_excel(file_path, engine='openpyxl')
+names = names_raw['Cue term'].tolist()
+
+def preprocess_names(names):
+    names_str_only = []
+    
+    for name in names:
+        try:
+            float(name)
+        except ValueError:
+            names_str_only.append(name)
+            
+    return names_str_only
+
+names_str_only = preprocess_names(names)
+
+data = [get_citations_and_hindex(name) for name in names_str_only]
+
+df = pd.DataFrame(data, columns=['Name', 'Citation Total', 'H-Index Total', 'Citation Last 6 Years', 'H-Index Last 6 Years', 'Citation Fraction', 'H-Index Fraction'])
+
+print(df)
