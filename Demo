@@ -1,0 +1,53 @@
+#The First Successful Demo
+import requests
+from bs4 import BeautifulSoup
+from tabulate import tabulate
+import pandas as pd
+
+def format_name(full_name):
+    parts = full_name.split()
+    
+    first_name = ""
+    middle_name = ""
+    last_name = ""
+    
+    if len(parts) == 3:
+        first_name, middle_name, last_name = parts
+        
+        if len(middle_name) == 1:
+            middle_name += "."
+    elif len(parts) == 2:
+        first_name, last_name = parts
+    else:
+        return "Invalid name format"
+    
+    if middle_name:
+        return f"{first_name}+{middle_name}+{last_name}"
+    else:
+        return f"{first_name}+{last_name}"
+    
+def get_citations_and_hindex(prof_name):
+
+    search_url = f"https://www.adscientificindex.com/citation-ranking/?q={format_name(prof_name)}"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+
+    response = requests.get(search_url, headers=headers)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+# Find all divs that contain the class 'c-title' and have the text 'Citation'
+    citations = soup.find_all('div', class_='c-title', string='Citation')
+    citation_div = citations[0].find_parent().find_parent().text if len(citations) >= 1 else "N/A"
+    h_indexes = soup.find_all('div', class_='c-title', string='H-Index')
+    h_index_div = h_indexes[0].find_parent().find_parent().text if len(h_indexes) >= 1 else "N/A"
+    
+    return citation_div, h_index_div
+
+file_path = "Dictionary__248256579.xlsx" #Need to be modified
+
+
+data = []
+for name in names_str_only:
+    citation, h_index = get_citations_and_hindex(name)
+    data.append([name, citation, h_index])
+    
+print(tabulate(data, headers=['Name', 'Citation', 'H-Index']))
